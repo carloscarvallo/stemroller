@@ -1,12 +1,12 @@
-import os from 'os'
-import fs from 'fs/promises'
-import { createWriteStream } from 'fs'
-import { pipeline } from 'stream/promises'
-import path from 'path'
 import childProcess from 'child_process'
-import treeKill from 'tree-kill'
-import sanitizeFilename from 'sanitize-filename'
 import { app, BrowserWindow, powerSaveBlocker } from 'electron'
+import { createWriteStream } from 'fs'
+import fs from 'fs/promises'
+import os from 'os'
+import path from 'path'
+import sanitizeFilename from 'sanitize-filename'
+import { pipeline } from 'stream/promises'
+import treeKill from 'tree-kill'
 import { fetchYtStream } from './fetchYtStream.js'
 
 let statusUpdateCallback = null,
@@ -270,6 +270,22 @@ async function _processVideo(video, tmpDir) {
     console.log(`Downloading YouTube video "${video.videoId}"; storing in "${ytPath}"`)
     await asyncYtdl(video.videoId, ytPath)
     mediaPath = ytPath
+
+    // Add pitch shift step here
+    const pitchedPath = path.join(tmpDir, 'pitched-audio.wav')
+    console.log('Applying pitch shift of -1 semitone')
+    await spawnAndWait(
+      video.videoId,
+      tmpDir,
+      FFMPEG_EXE_NAME,
+      [
+        '-i', mediaPath,
+        '-af', 'asetrate=44100*2^(-1/12),aresample=44100',
+        pitchedPath
+      ],
+      false
+    )
+    mediaPath = pitchedPath
   } else if (video.mediaSource === 'local') {
     mediaPath = video.localInputPath
   } else {
@@ -430,7 +446,7 @@ async function processVideo(video) {
     console.trace(err)
   }
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), TMP_PREFIX))
+  const tmpDir = await fs.mkdtemp(path.join('/Users/carlosc/Documents/dev/stemroller', 'tmp-'))
   try {
     await _processVideo(video, tmpDir)
   } catch (err) {
@@ -443,31 +459,31 @@ async function processVideo(video) {
       setVideoStatusAndPath(video.videoId, { step: 'error' }, null)
     }
   } finally {
-    curProgressFtStemIdx = null
+    // curProgressFtStemIdx = null
 
-    try {
-      await fs.rm(tmpDir, {
-        recursive: true,
-        maxRetries: 5,
-        retryDelay: 1000,
-      })
-    } catch (err) {
-      console.trace(err)
-    }
+    // try {
+    //   await fs.rm(tmpDir, {
+    //     recursive: true,
+    //     maxRetries: 5,
+    //     retryDelay: 1000,
+    //   })
+    // } catch (err) {
+    //   console.trace(err)
+    // }
 
-    // Will filter out the current (completed) video
-    setItems(curItems)
+    // // Will filter out the current (completed) video
+    // setItems(curItems)
 
-    if (powerSaveBlockId !== null) {
-      try {
-        powerSaveBlocker.stop(powerSaveBlockId)
-        console.log('Successfully unblocked power-save')
-      } catch (err) {
-        console.error('Failed to unblock power-save')
-        console.trace(err)
-      }
-      powerSaveBlockId = null
-    }
+    // if (powerSaveBlockId !== null) {
+    //   try {
+    //     powerSaveBlocker.stop(powerSaveBlockId)
+    //     console.log('Successfully unblocked power-save')
+    //   } catch (err) {
+    //     console.error('Failed to unblock power-save')
+    //     console.trace(err)
+    //   }
+    //   powerSaveBlockId = null
+    // }
   }
 }
 
