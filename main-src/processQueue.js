@@ -288,6 +288,22 @@ async function _processVideo(video, tmpDir) {
     mediaPath = pitchedPath
   } else if (video.mediaSource === 'local') {
     mediaPath = video.localInputPath
+
+    const pitchedPath = path.join(tmpDir, 'pitched-audio.wav')
+    console.log('Applying pitch shift of -1 semitone')
+    await spawnAndWait(
+      video.videoId,
+      tmpDir,
+      FFMPEG_EXE_NAME,
+      [
+        '-i', mediaPath,
+        '-af', 'asetrate=44100*2^(-1/12),aresample=44100',
+        pitchedPath
+      ],
+      false
+    )
+    mediaPath = pitchedPath
+
   } else {
     throw new Error(`Invalid mediaSource: ${video.mediaSource}`)
   }
